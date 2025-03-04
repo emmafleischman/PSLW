@@ -5,27 +5,30 @@
 BLEService dataService("180A");
 
 // BLE Characteristics
-// BLEStringCharacteristic dataCharacteristic("0000AAAA-0000-1000-8000-00805F9B34FB", BLERead | BLENotify, 128); // 20 is the maximum length of the string
-BLEIntCharacteristic writeCharacteristic("0000BBBB-0000-1000-8000-00805F9B34FB", BLEWrite);
+BLEStringCharacteristic dataCharacteristic("0000AAAA-0000-1000-8000-00805F9B34FB", BLERead | BLENotify, 128); // 20 is the maximum length of the string
+// BLEIntCharacteristic writeCharacteristic("0000BBBB-0000-1000-8000-00805F9B34FB", BLEWrite);
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH); // turn on the built-in LED
   
   Serial.begin(115200);
+  while(!Serial){}
+  
+  Serial.println("Hello, World!");
 
   // Init BLE
   while(!BLE.begin()){
     delay(10);
   }
 
-  BLE.setLocalName("Emma");
+  BLE.setLocalName("Arduino Nano BLE 33");
   BLE.setAdvertisedService(dataService);
   BLE.setAdvertisingInterval(100);
 
   // add the characteristics to the service
-  dataService.addCharacteristic(dataCharacteristic);
-  dataService.addCharacteristic(writeCharacteristic);
+   dataService.addCharacteristic(dataCharacteristic);
+//  dataService.addCharacteristic(writeCharacteristic);
 
   // add service
   BLE.addService(dataService);
@@ -41,14 +44,15 @@ void loop() {
   BLEDevice c = BLE.central();
   if(c && c.connected())
   {
-    Serial.println("Central connected, sending: %d", i);
+    Serial.print("Central connected, sending: ");
+    Serial.println(i);
     // Send message to central
-    dataCharacteristic.writeValue(i);
+    dataCharacteristic.writeValue(String(i));
     i++;
-    delay(1000);
+    delay(2000);
   }
   else
   {
-    Serial.println("Central not connected, will try again.");
+//    Serial.println("Central not connected, will try again.");
   }
 }
