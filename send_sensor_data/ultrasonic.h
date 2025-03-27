@@ -1,17 +1,22 @@
 #ifndef _ULTRASONIC_H_
 #define _ULTRASONIC_H_
 
-#define frontTrig    4
-#define frontEcho    3
-#define backTrig     6
-#define backEcho     5
-
 typedef enum {
     FRONT, 
     BACK
 } SensorPosition;
 
-extern void ultrasonic_setup();
-extern float ultrasonic_ping(SensorPosition pos);
+class Ultrasonic
+{
+    public:
+        Ultrasonic();
+        Ultrasonic(int frontTrig, int frontEcho, int backTrig, int backEcho);
+        float sendPing(SensorPosition pos);
+    private:
+        int m_front_trig;
+        int m_front_echo;
+        int m_back_trig;
+        int m_back_echo;
+};
 
- #endif
+#endif

@@ -1,6 +1,8 @@
 #include <ArduinoBLE.h>
 #include "ultrasonic.h"
 
+Ultrasonic u;
+
 // BLE Data Service
 BLEService dataService("180A");
 
@@ -14,7 +16,7 @@ void setup() {
     Serial.begin(115200);
     while(!Serial){}
 
-    ultrasonic_setup();
+    Ultrasonic u(4, 3, 6, 5);
     Serial.println("Hello, World!");
 
     // Init BLE
@@ -44,7 +46,7 @@ void loop() {
   if(c && c.connected())
   {
     Serial.print("Central connected.");
-    float data = ultrasonic_ping(FRONT);
+    float data = u.sendPing(FRONT);
     dataCharacteristic.writeValue(String(data));
     delay(1000);
   }
