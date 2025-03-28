@@ -6,8 +6,8 @@
 #define BACK_TRIGGER    6
 #define BACK_ECHO       5
 
-Ultrasonic front;
-Ultrasonic back;
+Ultrasonic front(FRONT_TRIGGER, FRONT_ECHO);
+Ultrasonic back(BACK_TRIGGER, BACK_ECHO);
 
 // BLE Data Service
 BLEService dataService("180A");
@@ -22,8 +22,7 @@ void setup() {
     Serial.begin(115200);
     while(!Serial){}
 
-    Ultrasonic front(FRONT_TRIGGER, FRONT_ECHO);
-    Ultrasonic back(BACK_TRIGGER, BACK_ECHO);
+    
 
     // Init BLE
     while(!BLE.begin()){
@@ -50,14 +49,20 @@ void loop() {
   if(c && c.connected())
   {
     Serial.print("Central connected.");
-    float data = front.sendPing();
-    dataCharacteristic.writeValue(String(data));
-    Serial.print("Sending data: ");
-    Serial.println(data);
+    while(1)
+    {
+      float data = back.sendPing();
+      float data2 = front.sendPing();
+      dataCharacteristic.writeValue(String(data));
+      Serial.print("Front: ");
+      Serial.print(data2);
+      Serial.print(" Back: ");
+      Serial.println(data);
+      delay(2000);
+    }
   }
   else
   {
 //    Serial.println("Central not connected, will try again.");
   }
-  delay(1000);
 }
