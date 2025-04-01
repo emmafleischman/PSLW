@@ -1,5 +1,5 @@
 #include <ArduinoBLE.h>
-#include "ultrasonic.h"
+#include "Ultrasonic.h"
 
 #define FRONT_TRIGGER   4
 #define FRONT_ECHO      3
@@ -29,7 +29,7 @@ void setup() {
         delay(10);
     }
 
-    BLE.setLocalName("ultrasonic system");
+    BLE.setLocalName("Arduino Nano BLE 33");
     BLE.setAdvertisedService(dataService);
     BLE.setAdvertisingInterval(100);
 
@@ -48,17 +48,17 @@ void loop() {
   BLEDevice c = BLE.central();
   if(c && c.connected())
   {
-    Serial.print("Central connected.");
-    while(1)
+    Serial.println("Central connected.");
+    while(c.connected())
     {
-      float data = back.sendPing();
+//      float data = back.sendPing();
       float data2 = front.sendPing();
-      dataCharacteristic.writeValue(String(data));
+      dataCharacteristic.writeValue(String(data2));
       Serial.print("Front: ");
-      Serial.print(data2);
-      Serial.print(" Back: ");
-      Serial.println(data);
-      delay(2000);
+      Serial.println(data2);
+//      Serial.print(" Back: ");
+//      Serial.println(data);
+      delay(200);
     }
   }
   else

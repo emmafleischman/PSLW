@@ -1,41 +1,34 @@
 #include <Arduino.h>
-#include "ultrasonic.h"
+#include "Ultrasonic.h"
 
 Ultrasonic::Ultrasonic(){};
 
-Ultrasonic::Ultrasonic(int frontTrig, int frontEcho, int backTrig, int backEcho)
-: m_front_trig{frontTrig}, m_front_echo{frontEcho}, m_back_trig{backTrig}, m_back_echo{backEcho}
+Ultrasonic::Ultrasonic(int trigger, int echo)
+: m_trigger{trigger}, m_echo{echo}
 {
-    pinMode(frontTrig, OUTPUT);
-    pinMode(frontEcho, INPUT);
-    pinMode(backTrig, OUTPUT);
-    pinMode(backEcho, INPUT);
+    pinMode(trigger, OUTPUT);
+    pinMode(echo, INPUT);
 }
 
-float Ultrasonic::sendPing(SensorPosition pos)
+float Ultrasonic::sendPing()
 {
-    float distance;
-    long frontDuration;
-    long backDuration;
-    switch(pos)
-    {
-        case FRONT:
-            digitalWrite(m_front_trig, HIGH);
-            delayMicroseconds(10);
-            digitalWrite(m_front_trig, LOW);
-            frontDuration = pulseIn(m_front_echo, HIGH, 1000000);
-            distance = frontDuration * 0.034 / 2;
-            break;
-        case BACK:
-            digitalWrite(m_back_trig, HIGH);
-            delayMicroseconds(10);
-            digitalWrite(m_back_trig, LOW);
-            backDuration = pulseIn(m_back_echo, HIGH, 1000000);
-            distance = backDuration * 0.034 / 2;
-            break;
-        default:
-            distance = -1;
-            break;
-        return distance;
-    }
+  digitalWrite(m_trigger, LOW);
+  delayMicroseconds(2);  
+  digitalWrite(m_trigger, HIGH);  
+  delayMicroseconds(10);  
+  digitalWrite(m_trigger, LOW);  
+
+  unsigned long startTime = micros();
+  while (digitalRead(m_echo) == LOW) {
+    startTime = micros();  
+  }
+
+  unsigned long endTime = micros();
+  while (digitalRead(m_echo) == HIGH) {
+    endTime = micros();  
+  }
+  unsigned long duration = endTime - startTime;
+  float distance = (duration / 29.0) / 2.0;  // Divide by 29 to convert microseconds to cm, divide by 2 for round-trip
+
+  return distance;
 }
