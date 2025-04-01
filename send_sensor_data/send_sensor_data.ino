@@ -9,11 +9,23 @@
 Ultrasonic front(FRONT_TRIGGER, FRONT_ECHO);
 Ultrasonic back(BACK_TRIGGER, BACK_ECHO);
 
+enum State {
+  EMPTY,
+  ADVERTISING,
+  CONNECTED,
+  SENDING
+};
+
+bool session_in_progress = false;
+
+State current_state = EMPTY;
+
 // BLE Data Service
 BLEService dataService("180A");
 
 // BLE Characteristics
 BLEStringCharacteristic dataCharacteristic("0000AAAA-0000-1000-8000-00805F9B34FB", BLERead | BLENotify, 128); // 20 is the maximum length of the string
+BLEIntCharacteristic writeCharacteristic("0000BBBB-0000-1000-8000-00805F9B34FB", BLEWrite);
 
 void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
@@ -42,27 +54,45 @@ void setup() {
     // start advertising
     BLE.advertise();
     Serial.println("BLE is Advertising.");
+    current_state = ADVERTISING;
 }
 
 void loop() {
-  BLEDevice c = BLE.central();
-  if(c && c.connected())
+  switch(current_state)
   {
-    Serial.println("Central connected.");
-    while(c.connected())
+    case ADVERTISING:
     {
-//      float data = back.sendPing();
-      float data2 = front.sendPing();
-      dataCharacteristic.writeValue(String(data2));
-      Serial.print("Front: ");
-      Serial.println(data2);
-//      Serial.print(" Back: ");
-//      Serial.println(data);
-      delay(200);
+      Serial.println("in advertising state.");
+      BLEDevice c = BLE.central();
+      if(c && c.connected())
+      {
+        Serial.println("Central is connected.");
+        current_state = CONNECTED;
+      }
+      break;
+    }
+    case CONNECTED:
+    {
+      Serial.println("Waiting to receive...");
+      // wait for request to send stuff
+      if(writeCharacteristic.written())
+      {
+        session_in_progress = writeCharacteristic.value();
+        Serial.print("Received: ");
+        Serial.println(session_in_progress);
+        current_state = SENDING;
+      }
+      break;
+    }
+    case SENDING:
+    {
+      Serial.print("Sending: ");
+      float data = front.sendPing();
+      dataCharacteristic.writeValue(String(data));
+      Serial.println(data);
+      // check if we should stop
+      break;
     }
   }
-  else
-  {
-//    Serial.println("Central not connected, will try again.");
-  }
+  delay(200);
 }
