@@ -1,5 +1,8 @@
 // #include <vector_type.h>
 #include <ArduinoBLE.h>
+#include "Ultrasonic.h"
+
+Ultrasonic front(4, 3);
 
 // BLE Data Service
 BLEService dataService("180A");
@@ -44,12 +47,14 @@ void loop() {
   BLEDevice c = BLE.central();
   if(c && c.connected())
   {
+    float data = front.sendPing(); // grabs distance in cm
     Serial.print("Central connected, sending: ");
-    Serial.println(i);
+    Serial.println(data);
     // Send message to central
-    dataCharacteristic.writeValue(String(i));
+    dataCharacteristic.writeValue(String(data));
+
     i++;
-    delay(2000);
+    delay(200);
   }
   else
   {
