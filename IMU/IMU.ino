@@ -1,5 +1,5 @@
-#include <Adafruit_LSM6DS33.h>
-#include <Adafruit_Sensor.h>
+#include <Arduino_BMI270_BMM150.h>
+//#include <Adafruit_Sensor.h>
 #include <Wire.h>
 #include <SPI.h>
 #include <math.h>
@@ -8,7 +8,7 @@
 
 Adafruit_DRV2605 drv;
 // Sensor instance
-Adafruit_LSM6DS33 lsm6ds;
+//Adafruit_LSM6DS33 lsm6ds;
 
 // Configuration parameters
 #define SAMPLE_RATE_HZ 50  // Sampling frequency in Hz
@@ -17,6 +17,7 @@ Adafruit_LSM6DS33 lsm6ds;
 #define MIN_STEP_TIME_MS 300 // Minimum time between steps in milliseconds
 
 // Variables for step detection and length estimation
+float accelX, accelY, accelZ, gryoX, gyroY, gyroZ;
 float accelMag = 0.0;  // Magnitude of acceleration
 float gyroMag = 0.0;   // Magnitude of angular velocity
 bool inSwingPhase = false;
@@ -40,41 +41,42 @@ void setup() {
   
   Serial.println("Ankle-Mounted Step Length Measurement");
   
-  // Initialize the LSM6DS33 sensor
-  if (!lsm6ds.begin_I2C()) {
-    Serial.println("Unable to initialize the LSM6DS33. Check your wiring!");
-    while (1);
+  // Init IMU
+  while(!IMU.begin()){
+    delay(10);
   }
-  Serial.println("LSM6DS33 initialized successfully");
-  
-  // Set the sensor ranges
-  lsm6ds.setAccelRange(LSM6DS_ACCEL_RANGE_4_G);
-  lsm6ds.setGyroRange(LSM6DS_GYRO_RANGE_500_DPS);
-  
-  // Set the data rates
-  lsm6ds.setAccelDataRate(LSM6DS_RATE_52_HZ);
-  lsm6ds.setGyroDataRate(LSM6DS_RATE_52_HZ);
+  // Init Motor Driver
+  while(!drv.begin()) {
+    delay(10);
+  }
+  drv.setMode(DRV2605_MODE_INTTRIG); // default, internal trigger when sending GO command
+  drv.selectLibrary(1);
+  drv.setWaveform(0, 84);  // ramp up medium 1, see datasheet part 11.2
+  drv.setWaveform(1, 1);  // strong click 100%, see datasheet part 11.2
+  drv.setWaveform(2, 0);  // end of waveforms
 }
 
 void loop() {
   // Read the sensor data
-  sensors_event_t accel, gyro, temp;
-  lsm6ds.getEvent(&accel, &gyro, &temp);
+
   
   // Calculate magnitude of acceleration without gravity
-  float accelX = accel.acceleration.x;
-  float accelY = accel.acceleration.y;
-  float accelZ = accel.acceleration.z - 9.8; // Remove gravity component (assuming Z is vertical)
+  // float accelX = accel.acceleration.x;
+  // float accelY = accel.acceleration.y;
+  // float accelZ = accel.acceleration.z - 9.8; // Remove gravity component (assuming Z is vertical, which lowkey might not be true)
+  IMU.readAcceleration(accelX,accelY,accelZ);
+  accelZ=accelZ - 9.8;
   accelMag = sqrt(accelX*accelX + accelY*accelY + accelZ*accelZ);
   
   // Calculate magnitude of angular velocity
-  gyroMag = sqrt(gyro.gyro.x*gyro.gyro.x + gyro.gyro.y*gyro.gyro.y + gyro.gyro.z*gyro.gyro.z);
+  IMU.readGyroscope(gryoX, gyroY, gyroZ);
+  gyroMag = sqrt(gryoX*gryoX + gyroY*gyroY + gyroZ*gyroZ);
   
   // Step detection and phase estimation algorithm
   stepDetection(accelMag, gyroMag);
   
   // Print data for debugging
-  printData(accel, gyro);
+  printData();
   
   // Wait to maintain the desired sampling rate
   delay(1000 / SAMPLE_RATE_HZ);
@@ -108,13 +110,17 @@ void stepDetection(float accelMag, float gyroMag) {
 
 void computeStepLength() {
   // Method 1: Based on swing time and user height
-  float lengthFromTime = K1 * userHeight * swingDuration;
+  // float lengthFromTime = K1 * userHeight * swingDuration;
   
   // Method 2: Based on acceleration magnitude
   float lengthFromAccel = K2 * sqrt(accelMag);
   
   // Combined approach (you may want to tune this or use only one method)
-  stepLength = (lengthFromTime + lengthFromAccel) / 2.0;
+//  stepLength = (lengthFromTime + lengthFromAccel) / 2.0;
+  if((stepLength > 0) && (lengthFromAccel < stepLength)){
+    drv.go();
+  }
+  stepLength = lengthFromAccel;
   
   // Update total distance
   totalDistance += stepLength;
@@ -125,25 +131,19 @@ void computeStepLength() {
   Serial.print(totalDistance);
   Serial.print(" cm, Count: ");
   Serial.println(stepCount);
-  Serial.print("Method One: ");
-  Serial.println(lengthFromTime);
-  Serial.print("Method Two: ");
+  Serial.print("Step length: ");
   Serial.println(lengthFromAccel);
+
+  //return lengthFromAccel;
 }
 
-void printData(sensors_event_t accel, sensors_event_t gyro) {
+void printData() {
   //Print accelerometer data
   Serial.print("Accel: ");
-  Serial.print(accel.acceleration.x); Serial.print(", ");
-  Serial.print(accel.acceleration.y); Serial.print(", ");
-  Serial.print(accel.acceleration.z); Serial.print(" m/s^2, Mag: ");
   Serial.print(accelMag); Serial.println(" m/s^2");
   
   // Print gyroscope data
   Serial.print("Gyro: ");
-  Serial.print(gyro.gyro.x); Serial.print(", ");
-  Serial.print(gyro.gyro.y); Serial.print(", ");
-  Serial.print(gyro.gyro.z); Serial.print(" rad/s, Mag: ");
   Serial.print(gyroMag); Serial.println(" rad/s");
   
   // Print phase information
