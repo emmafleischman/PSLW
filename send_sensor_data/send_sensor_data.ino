@@ -17,6 +17,7 @@ enum State {
 };
 
 bool session_in_progress = false;
+float number = 0.0;
 
 State current_state = EMPTY;
 
@@ -25,14 +26,14 @@ BLEService dataService("180A");
 
 // BLE Characteristics
 BLEStringCharacteristic dataCharacteristic("0000AAAA-0000-1000-8000-00805F9B34FB", BLERead | BLENotify, 128); // 20 is the maximum length of the string
-BLEIntCharacteristic writeCharacteristic("0000BBBB-0000-1000-8000-00805F9B34FB", BLEWrite);
+BLEFloatCharacteristic writeCharacteristic("0000BBBB-0000-1000-8000-00805F9B34FB", BLEWrite);
 
 void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH); // turn on the built-in LED
     
     Serial.begin(115200);
-    while(!Serial){}
+//    while(!Serial){}
 
     
 
@@ -47,13 +48,13 @@ void setup() {
 
     // add the characteristics to the service
     dataService.addCharacteristic(dataCharacteristic);
+    dataService.addCharacteristic(writeCharacteristic);
 
     // add service
     BLE.addService(dataService);
 
     // start advertising
-    BLE.advertise();
-    Serial.println("BLE is Advertising.");
+    
     current_state = ADVERTISING;
 }
 
@@ -62,17 +63,24 @@ void loop() {
   {
     case ADVERTISING:
     {
-      Serial.println("in advertising state.");
+      BLE.advertise();
+      Serial.println("BLE is Advertising.");
       BLEDevice c = BLE.central();
       if(c && c.connected())
       {
         Serial.println("Central is connected.");
-        current_state = CONNECTED;
+        current_state = CONNECTED; // edited
       }
       break;
     }
     case CONNECTED:
     {
+      BLEDevice c = BLE.central();
+      if(!c | !c.connected())
+      {
+        Serial.println("CONNECTION LOST");
+        current_state = ADVERTISING;
+      }
       Serial.println("Waiting to receive...");
       // wait for request to send stuff
       if(writeCharacteristic.written())
@@ -86,11 +94,24 @@ void loop() {
     }
     case SENDING:
     {
+      BLEDevice c = BLE.central();
+      if(!c | !c.connected())
+      {
+        Serial.println("CONNECTION LOST");
+        current_state = ADVERTISING;
+      }
       Serial.print("Sending: ");
       float data = front.sendPing();
       dataCharacteristic.writeValue(String(data));
       Serial.println(data);
       // check if we should stop
+      if(writeCharacteristic.written())
+      {
+        number = writeCharacteristic.value();
+        Serial.print("Received number: ");
+        Serial.println(number);
+        current_state = CONNECTED;
+      }
       break;
     }
   }

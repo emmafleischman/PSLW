@@ -41,8 +41,6 @@ void setup() {
   Serial.println("BLE is Advertising.");
 }
 
-int i = 0;
-
 void loop() {
   BLEDevice c = BLE.central();
   if(c && c.connected())
@@ -50,10 +48,7 @@ void loop() {
     float data = front.sendPing(); // grabs distance in cm
     Serial.print("Central connected, sending: ");
     Serial.println(data);
-    // Send message to central
     dataCharacteristic.writeValue(String(data));
-
-    i++;
     delay(200);
   }
   else
