@@ -22,6 +22,8 @@ void setup() {
 #define MAX_LEN       50
 #define CHECK_COUNT   3
 #define WINDOW_SIZE   5
+#define POLL_DELAY    20
+#define SWITCH_DELAY  0
 
 int idx = 0;
 float burst[BURST_SIZE];
@@ -71,54 +73,54 @@ void loop() {
       {
         idx = 0;
       }
-      delay(50);
+      delay(POLL_DELAY);
     }
     idx = 0;
     for(int i=3; i<BURST_SIZE; i++)
     {
       float data = front.sendPing();
       burst[i] = data;
-      delay(50);
+      delay(POLL_DELAY);
     }
     // Serial.print("Burst: ");
     // print_burst();
     float step_len = average_burst();
     Serial.print("FRONT STEP: ");
     Serial.println(step_len);
-//    poll_front = false;
-    delay(250);
+    poll_front = false;
+    delay(SWITCH_DELAY);
   }
-//  else
-//  {
-//    // Serial.println("BACK");
-//    while(idx < CHECK_COUNT)
-//    {
-//      float backData = back.sendPing();
-//      if(backData < MAX_LEN)
-//      {
-//        burst[idx] = backData;
-//        idx++;
-//      }
-//      else
-//      {
-//        idx = 0;
-//      }
-//      delay(50);
-//    }
-//    idx = 0;
-//    for(int i=3; i<BURST_SIZE; i++)
-//    {
-//      float data = back.sendPing();
-//      burst[i] = data;
-//      delay(50);
-//    }
-//    // Serial.print("Burst: ");
-//    // print_burst();
-//    float step_len = average_burst();
-////    Serial.print("BACK  STEP: ");
-////    Serial.println(step_len);
-//    poll_front = true;
-//  }
+  else
+  {
+    // Serial.println("BACK");
+    while(idx < CHECK_COUNT)
+    {
+      float backData = back.sendPing();
+      if(backData < MAX_LEN)
+      {
+        burst[idx] = backData;
+        idx++;
+      }
+      else
+      {
+        idx = 0;
+      }
+      delay(POLL_DELAY);
+    }
+    idx = 0;
+    for(int i=3; i<BURST_SIZE; i++)
+    {
+      float data = back.sendPing();
+      burst[i] = data;
+      delay(POLL_DELAY);
+    }
+    // Serial.print("Burst: ");
+    // print_burst();
+    float step_len = average_burst();
+//    Serial.print("BACK  STEP: ");
+//    Serial.println(step_len);
+    poll_front = true;
+  }
 //  poll_front = ~poll_front;
 }
      
