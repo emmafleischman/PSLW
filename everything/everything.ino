@@ -1,5 +1,7 @@
 #include <ArduinoBLE.h>
+#include "Adafruit_DRV2605.h"
 #include "Ultrasonic.h"
+#include "StepLength.h"
 
 #define TIMER_INTERRUPT_DEBUG         0
 #define _TIMERINTERRUPT_LOGLEVEL_     0
@@ -8,78 +10,84 @@
 #include "NRF52_MBED_ISR_Timer.h"
 
 #define DEBUG
-// #define BLACK
-#define GRAY
+#define BLACK
+// #define GRAY
 
-#define FRONT_TRIGGER   4
-#define FRONT_ECHO      3
+#define TRIGGER   4
+#define ECHO      3
 
 enum State {
     INIT,
     ADVERTISING,
     WAITING,
-    ALGORITHM,
-    TIMEOUT
+    CALIBRATION,
+    ALGORITHM
 };
-volatile State current_state = INIT;
+State current_state = INIT;
+
+Adafruit_DRV2605 buzzer;
 
 BLEService dataService("180A");
-BLEStringCharacteristic dataCharacteristic("0000AAAA-0000-1000-8000-00805F9B34FB", BLERead | BLENotify, 20); 
+BLEStringCharacteristic dataCharacteristic("0000AAAA-0000-1000-8000-00805F9B34FB", BLERead | BLENotify, 128); 
 BLEFloatCharacteristic writeCharacteristic("0000BBBB-0000-1000-8000-00805F9B34FB", BLEWrite);
 
 NRF52_MBED_Timer ITimer(NRF_TIMER_3);
 NRF52_MBED_ISRTimer ISR_Timer;
 bool advertise_timeout = 0;
 
-Ultrasonic front(FRONT_TRIGGER, FRONT_ECHO);
+Ultrasonic front(TRIGGER, ECHO);
 
 void TimerHandler()
 {
-    ISR_Timer.run();
+   ISR_Timer.run();
 }
 
 
 void advertisingISR()
 {
-    advertise_timeout = 1;
+   advertise_timeout = 1;
 }
 
 void setup()
 {
     pinMode(LED_BUILTIN,  OUTPUT);
 
+    buzzer.setMode(DRV2605_MODE_INTTRIG); // default, internal trigger when sending GO command
+    buzzer.selectLibrary(1);
+    buzzer.setWaveform(0, 84);  // ramp up medium 1, see datasheet part 11.2
+    buzzer.setWaveform(1, 1);  // strong click 100%, see datasheet part 11.2
+    buzzer.setWaveform(2, 0);  // end of waveforms
+
     #ifdef DEBUG
         Serial.begin(115200);
         while(!Serial){}
     #endif
 
-    while(!BLE.begin()){}
-
-    #ifdef BLACK
-        BLE.setLocalName("Black Step Detector");
-    #endif
-    #ifdef GRAY
-        BLE.setLocalName("Gray Step Detector");
-    #endif
-// todo: change order of these
+    while(!BLE.begin())
+    {
+      delay(10);
+    }
+   #ifdef BLACK
+       BLE.setLocalName("Black Step Detector");
+   #endif
+   #ifdef GRAY
+       BLE.setLocalName("Gray Step Detector");
+   #endif
     BLE.setAdvertisedService(dataService);
     BLE.setAdvertisingInterval(100);
     dataService.addCharacteristic(dataCharacteristic);
     dataService.addCharacteristic(writeCharacteristic);
     BLE.addService(dataService);
-    BLE.advertise();
-    #ifdef DEBUG
-        Serial.println("BLE is advertising.");
-    #endif
+
     current_state = ADVERTISING;
   
-    if (!ITimer.attachInterruptInterval(1000, TimerHandler)) // ms
-    {
-        #ifdef DEBUG
-            Serial.println("Timer failed to set up.");
-        #endif
-    }
-    ISR_Timer.setInterval(10000L,  advertisingISR);
+   if (!ITimer.attachInterruptInterval(1000, TimerHandler)) // ms
+   {
+       #ifdef DEBUG
+           Serial.println("Timer failed to set up.");
+       #endif
+   }
+   ISR_Timer.setInterval(10000L,  advertisingISR);
 }
 
 void loop()
@@ -88,16 +96,19 @@ void loop()
     {
         case ADVERTISING:
         {
+            BLE.advertise();
+            #ifdef DEBUG
+                Serial.println("BLE is advertising.");
+            #endif
             if(advertise_timeout)
             {
               BLE.stopAdvertise();
-              current_state = ALGORITHM;
+              current_state = CALIBRATION;
               break;
             }
-            /* check if 10 seconds have gone by */
             
-            BLEDevice app = BLE.central();
-            if(app && app.connected())
+            BLEDevice c = BLE.central();
+            if(c && c.connected())
             {
                 #ifdef DEBUG
                     Serial.println("App is connected.");
@@ -113,17 +124,43 @@ void loop()
             #endif
             if(writeCharacteristic.written())
             {
-                int number = writeCharacteristic.value();
+                float number = writeCharacteristic.value();
                 Serial.print("Received number: ");
                 Serial.println(number);
                 current_state = ALGORITHM;
             }
             break;
         }
+        case CALIBRATION:
+        {
+            #ifdef DEBUG
+                Serial.println("Calibration Beginning.");
+            #endif
+
+            // BUZZ 3x
+            buzzer.go();
+            buzzer.go();
+            buzzer.go();
+
+            runCalibration(front);
+
+            buzzer.go();
+            buzzer.go();
+            buzzer.go();
+
+            #ifdef DEBUG
+                Serial.print("Calibration Complete. Target Step Length: ");
+                Serial.println(target_step_length);
+            #endif
+
+            current_state = ALGORITHM;
+            break;
+        }
         case ALGORITHM:
         {
-          Serial.println("algo.");
-          delay(1000);
+            #ifdef DEBUG
+                Serial.print("Algorithm State.");
+            #endif
             break;
         }
     }
