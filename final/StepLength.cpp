@@ -97,7 +97,14 @@ runAlgorithm(Ultrasonic *device, Adafruit_DRV2605 *buzzer){
                 cumStepLen += getStepLength(device);
             }
         }
-        if(PCT_THRESH*target_step_length > cumStepLen/ALGO_WINDOW_LEN){
+        float window_avg_step_length = cumStepLen / ALGO_WINDOW_LEN;
+        
+        #ifdef DEBUG
+          Serial.print("window avg step length: ");
+          Serial.println(window_avg_step_length);
+        #endif
+        
+        if(PCT_THRESH*target_step_length > window_avg_step_length){
             // we want to buzz!
             buzzer->go();
         }
