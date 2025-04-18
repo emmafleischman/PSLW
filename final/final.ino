@@ -1,15 +1,19 @@
-#include <ArduinoBLE.h>
+//#define BLUETOOTH
+
+#ifdef BLUETOOTH
+    #include <ArduinoBLE.h>
+#endif
 #include "Adafruit_DRV2605.h"
 #include <Adafruit_Sensor.h>
 #include "Ultrasonic.h"
 #include "StepLength.h"
 #include <Arduino_BMI270_BMM150.h>
 
-#define TIMER_INTERRUPT_DEBUG         0
-#define _TIMERINTERRUPT_LOGLEVEL_     0
-
-#include "NRF52_MBED_TimerInterrupt.h"
-#include "NRF52_MBED_ISR_Timer.h"
+//#define TIMER_INTERRUPT_DEBUG         0
+//#define _TIMERINTERRUPT_LOGLEVEL_     0
+//
+//#include "NRF52_MBED_TimerInterrupt.h"
+//#include "NRF52_MBED_ISR_Timer.h"
 
 #define DEBUG
 #define BLACK
@@ -29,25 +33,29 @@ State current_state = INIT;
 
 Adafruit_DRV2605 buzzer;
 
+#ifdef BLUETOOTH
 BLEService dataService("180A");
 BLEStringCharacteristic dataCharacteristic("0000AAAA-0000-1000-8000-00805F9B34FB", BLERead | BLENotify, 128); 
 BLEFloatCharacteristic writeCharacteristic("0000BBBB-0000-1000-8000-00805F9B34FB", BLEWrite);
+#endif
 
-NRF52_MBED_Timer ITimer(NRF_TIMER_3);
-NRF52_MBED_ISRTimer ISR_Timer;
-bool advertise_timeout = 0;
+//NRF52_MBED_Timer ITimer(NRF_TIMER_3);
+//NRF52_MBED_ISRTimer ISR_Timer;
+//bool advertise_timeout = 0;
 
 Ultrasonic front(TRIGGER, ECHO);
 
-void TimerHandler()
-{
-   ISR_Timer.run();
-}
-
-void advertisingISR()
-{
-   advertise_timeout = 1;
-}
+#ifdef BLUETOOTH
+    void TimerHandler()
+    {
+       ISR_Timer.run();
+    }
+    
+    void advertisingISR()
+    {
+       advertise_timeout = 1;
+    }
+#endif
 
 void setup()
 {
@@ -71,31 +79,35 @@ void setup()
         while(!Serial){}
     #endif
 
-    while(!BLE.begin())
-    {
-      delay(10);
-    }
-   #ifdef BLACK
-       BLE.setLocalName("Black Step Detector");
-   #endif
-   #ifdef GRAY
-       BLE.setLocalName("Gray Step Detector");
-   #endif
-    BLE.setAdvertisedService(dataService);
-    BLE.setAdvertisingInterval(100);
-    dataService.addCharacteristic(dataCharacteristic);
-    dataService.addCharacteristic(writeCharacteristic);
-    BLE.addService(dataService);
+    #ifdef BLUETOOTH
+        while(!BLE.begin())
+        {
+          delay(10);
+        }
+       #ifdef BLACK
+           BLE.setLocalName("Black Step Detector");
+       #endif
+       #ifdef GRAY
+           BLE.setLocalName("Gray Step Detector");
+       #endif
+        BLE.setAdvertisedService(dataService);
+        BLE.setAdvertisingInterval(100);
+        dataService.addCharacteristic(dataCharacteristic);
+        dataService.addCharacteristic(writeCharacteristic);
+        BLE.addService(dataService);
+      
+        if (!ITimer.attachInterruptInterval(1000, TimerHandler)) // ms
+        {
+            #ifdef DEBUG
+                Serial.println("Timer failed to set up.");
+            #endif
+        }
+        ISR_Timer.setInterval(10000L,  advertisingISR);
 
-    current_state = ADVERTISING;
-  
-    if (!ITimer.attachInterruptInterval(1000, TimerHandler)) // ms
-    {
-        #ifdef DEBUG
-            Serial.println("Timer failed to set up.");
-        #endif
-    }
-    ISR_Timer.setInterval(10000L,  advertisingISR);
+        current_state = ADVERTISING;
+    #else
+        current_state = CALIBRATION;
+    #endif
 }
 
 void loop()
@@ -104,39 +116,43 @@ void loop()
     {
         case ADVERTISING:
         {
-            BLE.advertise();
-            #ifdef DEBUG
-                Serial.println("BLE is advertising.");
-            #endif
-            if(advertise_timeout)
-            {
-              BLE.stopAdvertise();
-              current_state = CALIBRATION;
-              break;
-            }
-            
-            BLEDevice c = BLE.central();
-            if(c && c.connected())
-            {
+            #ifdef BLUETOOTH
+                BLE.advertise();
                 #ifdef DEBUG
-                    Serial.println("App is connected.");
+                    Serial.println("BLE is advertising.");
                 #endif
-                current_state = WAITING;
-            }
+                if(advertise_timeout)
+                {
+                  BLE.stopAdvertise();
+                  current_state = CALIBRATION;
+                  break;
+                }
+                
+                BLEDevice c = BLE.central();
+                if(c && c.connected())
+                {
+                    #ifdef DEBUG
+                        Serial.println("App is connected.");
+                    #endif
+                    current_state = WAITING;
+                }
+            #endif
             break;
         }
         case WAITING:
         {
-            #ifdef DEBUG
-                Serial.println("Listening for start session.");
+            #ifdef BLUETOOTH
+                #ifdef DEBUG
+                    Serial.println("Listening for start session.");
+                #endif
+                if(writeCharacteristic.written())
+                {
+                    float number = writeCharacteristic.value();
+                    Serial.print("Received number: ");
+                    Serial.println(number);
+                    current_state = ALGORITHM;
+                }
             #endif
-            if(writeCharacteristic.written())
-            {
-                float number = writeCharacteristic.value();
-                Serial.print("Received number: ");
-                Serial.println(number);
-                current_state = ALGORITHM;
-            }
             break;
         }
         case CALIBRATION:
