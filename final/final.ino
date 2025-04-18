@@ -7,7 +7,7 @@
 #include <Adafruit_Sensor.h>
 #include "Ultrasonic.h"
 #include "StepLength.h"
-#include <Arduino_BMI270_BMM150.h>
+//#include <Arduino_BMI270_BMM150.h>
 
 //#define TIMER_INTERRUPT_DEBUG         0
 //#define _TIMERINTERRUPT_LOGLEVEL_     0
@@ -61,12 +61,12 @@ void setup()
 {
     pinMode(LED_BUILTIN,  OUTPUT);
 
-    // IMU setup
-    if(!IMU.begin()){
-        Serial.println("failed to initialize the IMU!\n");
-    }else{
-        Serial.println("initialized the IMU\n");
-    }
+//    // IMU setup
+//    if(!IMU.begin()){
+//        Serial.println("failed to initialize the IMU!\n");
+//    }else{
+//        Serial.println("initialized the IMU\n");
+//    }
 
     buzzer.setMode(DRV2605_MODE_INTTRIG); // default, internal trigger when sending GO command
     buzzer.selectLibrary(1);
@@ -186,7 +186,7 @@ void loop()
                 Serial.print("Algorithm State.");
             #endif
 
-            runAlgorithm(&front, &buzzer);
+//            runAlgorithm(&front, &buzzer);
             break;
         }
     }
