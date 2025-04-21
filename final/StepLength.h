@@ -2,7 +2,7 @@
 #define _STEP_LENGTH_H_
 
 //#include "Arduino_BMI270_BMM150.h"
-#include "Adafruit_DRV2605.h"
+#include "Buzzer.h"
 #include "Ultrasonic.h"
 
 #define BURST_LENGTH                10
@@ -19,6 +19,6 @@ extern float burst[];
 
 void runCalibration(Ultrasonic *device);
 float getStepLength(Ultrasonic *device);
-void runAlgorithm(Ultrasonic *device, Adafruit_DRV2605 *buzzer);
+void runAlgorithm(Ultrasonic *device, Buzzer *buzzer);
 
 #endif

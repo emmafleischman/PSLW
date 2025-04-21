@@ -1,19 +1,20 @@
-//#define BLUETOOTH
+#define BLUETOOTH
 
-#ifdef BLUETOOTH
-    #include <ArduinoBLE.h>
-#endif
-#include "Adafruit_DRV2605.h"
 #include <Adafruit_Sensor.h>
 #include "Ultrasonic.h"
+#include "Buzzer.h"
 #include "StepLength.h"
 #include <Arduino_BMI270_BMM150.h>
 
-//#define TIMER_INTERRUPT_DEBUG         0
-//#define _TIMERINTERRUPT_LOGLEVEL_     0
-//
-//#include "NRF52_MBED_TimerInterrupt.h"
-//#include "NRF52_MBED_ISR_Timer.h"
+#ifdef BLUETOOTH
+#include <ArduinoBLE.h>
+
+#define TIMER_INTERRUPT_DEBUG         0
+#define _TIMERINTERRUPT_LOGLEVEL_     0
+
+#include "NRF52_MBED_TimerInterrupt.h"
+#include "NRF52_MBED_ISR_Timer.h"
+#endif
 
 #define DEBUG
 #define BLACK
@@ -31,18 +32,18 @@ enum State {
 };
 State current_state = INIT;
 
-Adafruit_DRV2605 buzzer;
-
 #ifdef BLUETOOTH
+bool bluetooth_connected = 0;
 BLEService dataService("180A");
 BLEStringCharacteristic dataCharacteristic("0000AAAA-0000-1000-8000-00805F9B34FB", BLERead | BLENotify, 128); 
 BLEFloatCharacteristic writeCharacteristic("0000BBBB-0000-1000-8000-00805F9B34FB", BLEWrite);
+
+NRF52_MBED_Timer ITimer(NRF_TIMER_3);
+NRF52_MBED_ISRTimer ISR_Timer;
+bool advertise_timeout = 0;
 #endif
 
-//NRF52_MBED_Timer ITimer(NRF_TIMER_3);
-//NRF52_MBED_ISRTimer ISR_Timer;
-//bool advertise_timeout = 0;
-
+Buzzer buzzer;
 Ultrasonic front(TRIGGER, ECHO);
 
 #ifdef BLUETOOTH
@@ -71,16 +72,7 @@ void setup()
    }else{
        Serial.println("initialized the IMU\n");
    }
-    buzzer.begin();
-    buzzer.setMode(DRV2605_MODE_INTTRIG); // default, internal trigger when sending GO command
-    buzzer.selectLibrary(1);
-    buzzer.setWaveform(0, 84);  // ramp up medium 1, see datasheet part 11.2
-    buzzer.setWaveform(1, 1);  // strong click 100%, see datasheet part 11.2
-    buzzer.setWaveform(2, 0);  // end of waveforms
 
-
-
-    Serial.print("in setup\n");
     #ifdef BLUETOOTH
         while(!BLE.begin())
         {
@@ -125,14 +117,18 @@ void loop()
                 #endif
                 if(advertise_timeout)
                 {
-                  BLE.stopAdvertise();
-                  current_state = CALIBRATION;
-                  break;
+                    #ifdef DEBUG
+                        Serial.println("BLE Timeout > moving on without the app.");
+                    #endif
+                    BLE.stopAdvertise();
+                    current_state = CALIBRATION;
+                    break;
                 }
                 
                 BLEDevice c = BLE.central();
                 if(c && c.connected())
                 {
+                    bluetooth_connected = 1;
                     #ifdef DEBUG
                         Serial.println("App is connected.");
                     #endif
@@ -164,15 +160,11 @@ void loop()
             #endif
 
             // BUZZ 3x
-            buzzer.go();
-            buzzer.go();
-            buzzer.go();
+            buzzer.tripleBuzz();
 
             runCalibration(&front);
 
-            buzzer.go();
-            buzzer.go();
-            buzzer.go();
+            buzzer.tripleBuzz();
 
             #ifdef DEBUG
                 Serial.print("Calibration Complete. Target Step Length: ");
@@ -185,7 +177,13 @@ void loop()
         case ALGORITHM:
         {
             #ifdef DEBUG
+                Serial.println("Algorithm State.");
             #endif
+
+            /*
+            TODO: add sending of data over Bluetooth
+            based on value of bluetooth_connected
+            */
 
             runAlgorithm(&front, &buzzer);
             break;

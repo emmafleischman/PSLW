@@ -72,7 +72,7 @@ getStepLength(Ultrasonic *device)
 }
 
 void
-runAlgorithm(Ultrasonic *device, Adafruit_DRV2605 *buzzer){
+runAlgorithm(Ultrasonic *device, Buzzer *buzzer){
    float ax, ay, az, accelMagOne, accelMagTwo;
    float gx, gy, gz, gyroMagOne, gyroMagTwo;
    while(1){
@@ -113,9 +113,9 @@ runAlgorithm(Ultrasonic *device, Adafruit_DRV2605 *buzzer){
 
                if(accelMagOne > 0.4 && accelMagTwo > 0.4 && gyroMagOne > 50 && gyroMagTwo > 50){
                     Serial.print("IMU moving, so buzzing!");
-                   buzzer->go();
+                   buzzer->singleBuzz();
                    delay(50);
-                   buzzer->go();
+                   buzzer->singleBuzz();
                }
 
 
@@ -133,7 +133,7 @@ runAlgorithm(Ultrasonic *device, Adafruit_DRV2605 *buzzer){
        if(PCT_THRESH*target_step_length > window_avg_step_length){
            // we want to buzz!
            Serial.print("Step length is less than the target step length, so buzzing!");
-           buzzer->go();
+           buzzer->singleBuzz();
        }
    }
 }
