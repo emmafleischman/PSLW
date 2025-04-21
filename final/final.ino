@@ -7,7 +7,7 @@
 #include <Adafruit_Sensor.h>
 #include "Ultrasonic.h"
 #include "StepLength.h"
-//#include <Arduino_BMI270_BMM150.h>
+#include <Arduino_BMI270_BMM150.h>
 
 //#define TIMER_INTERRUPT_DEBUG         0
 //#define _TIMERINTERRUPT_LOGLEVEL_     0
@@ -19,8 +19,8 @@
 #define BLACK
 // #define GRAY
 
-#define TRIGGER   4
-#define ECHO      3
+#define TRIGGER   3
+#define ECHO      5
 
 enum State {
     INIT,
@@ -59,26 +59,28 @@ Ultrasonic front(TRIGGER, ECHO);
 
 void setup()
 {
+    #ifdef DEBUG
+        Serial.begin(115200);
+        while(!Serial){}
+    #endif
     pinMode(LED_BUILTIN,  OUTPUT);
 
-//    // IMU setup
-//    if(!IMU.begin()){
-//        Serial.println("failed to initialize the IMU!\n");
-//    }else{
-//        Serial.println("initialized the IMU\n");
-//    }
-
+   // IMU setup
+   if(!IMU.begin()){
+       Serial.println("failed to initialize the IMU!\n");
+   }else{
+       Serial.println("initialized the IMU\n");
+   }
+    buzzer.begin();
     buzzer.setMode(DRV2605_MODE_INTTRIG); // default, internal trigger when sending GO command
     buzzer.selectLibrary(1);
     buzzer.setWaveform(0, 84);  // ramp up medium 1, see datasheet part 11.2
     buzzer.setWaveform(1, 1);  // strong click 100%, see datasheet part 11.2
     buzzer.setWaveform(2, 0);  // end of waveforms
 
-    #ifdef DEBUG
-        Serial.begin(115200);
-        while(!Serial){}
-    #endif
 
+
+    Serial.print("in setup\n");
     #ifdef BLUETOOTH
         while(!BLE.begin())
         {
@@ -183,10 +185,9 @@ void loop()
         case ALGORITHM:
         {
             #ifdef DEBUG
-                Serial.print("Algorithm State.");
             #endif
 
-//            runAlgorithm(&front, &buzzer);
+            runAlgorithm(&front, &buzzer);
             break;
         }
     }

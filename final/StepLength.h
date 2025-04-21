@@ -11,7 +11,7 @@
 #define CALIBRATION_STEPS           5
 #define POLL_DELAY_MS               10
 #define ALGO_WINDOW_LEN              4
-const float PCT_THRESH = 0.2;
+const float PCT_THRESH = 0.8;
 #define NO_STEP_MAX_TIME          5000
 
 extern float target_step_length;
@@ -19,6 +19,6 @@ extern float burst[];
 
 void runCalibration(Ultrasonic *device);
 float getStepLength(Ultrasonic *device);
-//void runAlgorithm(Ultrasonic *device, Adafruit_DRV2605 *buzzer);
+void runAlgorithm(Ultrasonic *device, Adafruit_DRV2605 *buzzer);
 
 #endif
