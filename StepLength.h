@@ -4,6 +4,9 @@
 //#include "Arduino_BMI270_BMM150.h"
 #include "Adafruit_DRV2605.h"
 #include "Ultrasonic.h"
+#include <bluefruit.h>
+
+#define DEBUG
 
 #define BURST_LENGTH                10
 #define MIN_INITIAL_VALID_READINGS  3
@@ -17,8 +20,9 @@ const float PCT_THRESH = 0.8;
 extern float target_step_length;
 extern float burst[];
 
-void runCalibration(Ultrasonic *device);
+void imuInit();
+float runCalibration(Ultrasonic *device);
 float getStepLength(Ultrasonic *device);
-void runAlgorithm(Ultrasonic *device, Adafruit_DRV2605 *buzzer);
+void runAlgorithm(Ultrasonic *device, Adafruit_DRV2605 *buzzer, BLECharacteristic *stepLengthChar, bool *pause);
 
 #endif

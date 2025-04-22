@@ -1,38 +1,48 @@
 #include "StepLength.h"
 #include "arduino.h"
-#include <Arduino_BMI270_BMM150.h>
+// #include <Arduino_BMI270_BMM150.h>
+#include <Adafruit_LSM6DS33.h>
+
+Adafruit_LSM6DS33 lsm6ds33;
+sensors_event_t accel;
+sensors_event_t gyro;
+sensors_event_t temp;
 
 float target_step_length = 0.0;
 float burst[BURST_LENGTH];
 
-void 
+void imuInit()
+{
+    lsm6ds33.begin_I2C();
+}
+
+float 
 runCalibration(Ultrasonic *device)
 {
+    imuInit();
     for(int i=0; i<CALIBRATION_STEPS; i++)
     {
-        // Serial.print(i);
-        // Serial.print("\n");
         float stepLen = getStepLength(device);
-        // Serial.print("got stepLen");
         while(stepLen == -1){
-            // Serial.println("Got a bad step, so going to reread");
             stepLen = getStepLength(device);
         }
-        target_step_length += getStepLength(device);
-        delay(300); // delay added
-        // Serial.print(target_step_length);
-        // Serial.print("\n");
-
+        #ifdef DEBUG
+            Serial.print("Step length: ");
+            Serial.println(stepLen);
+        #endif
+        target_step_length += stepLen;
+        delay(400); 
     }
     target_step_length = target_step_length / CALIBRATION_STEPS;
+    return target_step_length;
 }
 
 float 
 getStepLength(Ultrasonic *device)
 {
     int i = 0;
-    float total_length = 0;
-    float n = 0;
+    float total_length = 0.0;
+    float n = 0.0;
 
     unsigned long startTime = millis() ;
     // checks if we get 3 valid readings
@@ -73,68 +83,109 @@ getStepLength(Ultrasonic *device)
 }
 
 void
-runAlgorithm(Ultrasonic *device, Adafruit_DRV2605 *buzzer){
+runAlgorithm(Ultrasonic *device, Adafruit_DRV2605 *buzzer, BLECharacteristic *stepLengthChar, bool *pause){
    float ax, ay, az, accelMagOne, accelMagTwo;
    float gx, gy, gz, gyroMagOne, gyroMagTwo;
-   while(1){
+   
+   while(1)
+   {
        int cumStepLen=0;
        for(int i=0; i<ALGO_WINDOW_LEN; i++){
+            if(*pause)
+            {
+                return;
+            }
            float stepLen = getStepLength(device);
-        //    Serial.print("Got a step. Length: \n");
-        //    Serial.println(stepLen);
+           #ifdef DEBUG
+           Serial.print("Got a step. Length: \n");
+           Serial.println(stepLen);
+           #endif
+
            if(stepLen < 0){ 
-                // Serial.println("Bad ultrasonic readings, so resorting to IMU");
+                #ifdef DEBUG
+                Serial.println("Bad ultrasonic readings, so resorting to IMU");
+                #endif
                // we haven't had a step in a while from ultrasonic! resort to IMU
                // we now want to see if there are actually steps (so check if IMU has movement). If IMU has movement over a couple windows,
                // then that means we're taking steps that are small, so we buzz.
                // if IMU has no movement, then we're just standing still, so we can continue this loop, and it'll wait for more ultrasonic readings
 
+                lsm6ds33.getEvent(&accel, &gyro, &temp);
+                ax = accel.acceleration.x;
+                ay = accel.acceleration.y;
+                az = accel.acceleration.z;
+                gx = gyro.gyro.x;
+                gy = gyro.gyro.y;
+                gz = gyro.gyro.z;
 
                // read twice, 50 milisecond apart. if both indicate steps, then buzz. (code could be better factored)
-               IMU.readAcceleration(ax, ay, az);
-               IMU.readGyroscope(gx, gy, gz);
-               accelMagOne = sq(ax) + sq(ay)+sq(az);
+                accelMagOne = sq(ax) + sq(ay)+sq(az);
                 gyroMagOne = sq(gx) + sq(gy)+sq(gz);
 
-                // Serial.print("Reading IMU. Accel mag: ");
-                // Serial.print(accelMagOne);
-                // Serial.print(" gyro magOne: ");
-                // Serial.println(gyroMagOne);
+                #ifdef DEBUG
+                Serial.print("Reading IMU. Accel mag: ");
+                Serial.print(accelMagOne);
+                Serial.print(" gyro magOne: ");
+                Serial.println(gyroMagOne);
+                #endif
+
                delay(50); // arbitrary
-               IMU.readAcceleration(ax, ay, az);
-               IMU.readGyroscope(gx, gy, gz);
+                lsm6ds33.getEvent(&accel, &gyro, &temp);
+                ax = accel.acceleration.x;
+                ay = accel.acceleration.y;
+                az = accel.acceleration.z;
+                gx = gyro.gyro.x;
+                gy = gyro.gyro.y;
+                gz = gyro.gyro.z;
                accelMagTwo = sq(ax) + sq(ay)+ sq(az);
                gyroMagTwo = sq(gx) + sq(gy)+ sq(gz);
 
+                #ifdef DEBUG
+                Serial.print("Reading IMU. Accel mag: ");
+                Serial.print(accelMagTwo);
+                Serial.print(" gyro magtwo: ");
+                Serial.println(gyroMagTwo);
+                #endif
 
-                // Serial.print("Reading IMU. Accel mag: ");
-                // Serial.print(accelMagTwo);
-                // Serial.print(" gyro magtwo: ");
-                // Serial.println(gyroMagTwo);
-
-               if(accelMagOne > 0.4 && accelMagTwo > 0.4 && gyroMagOne > 50 && gyroMagTwo > 50){
-                    // Serial.print("IMU moving, so buzzing!");
-                   buzzer->go();
-                   delay(50);
-                   buzzer->go();
+               if(accelMagOne > 92 && accelMagTwo > 92 && gyroMagOne > .05 && gyroMagTwo > 0.05){
+                    buzzer->go();
+                    delay(50);
+                    buzzer->go();
+                    if (stepLengthChar->notifyEnabled()) 
+                    {
+                        stepLengthChar->notify((uint8_t *)&stepLen, sizeof(float));
+                    } 
                }
 
-
                cumStepLen = 32767; // hopefully the max lol
-           }else{
+           } 
+           else
+           {
+                if (stepLengthChar->notifyEnabled()) 
+                {
+                    stepLengthChar->notify((uint8_t *)&stepLen, sizeof(float));
+                }
                cumStepLen += stepLen;
            }
            delay(1000);   // this represents minimum reasonable time length between steps. prolly should be like 300-500ms
         }
-       float window_avg_step_length = cumStepLen / ALGO_WINDOW_LEN;
-       
-        // Serial.print("window avg step length: ");
-        // Serial.println(window_avg_step_length);
+        float window_avg_step_length = cumStepLen / ALGO_WINDOW_LEN;
+        #ifdef DEBUG
+        Serial.print("window avg step length: ");
+        Serial.println(window_avg_step_length);
+        #endif
        
        if(PCT_THRESH*target_step_length > window_avg_step_length){
-           // we want to buzz!
-        //    Serial.print("Step length is less than the target step length, so buzzing!");
+            // we want to buzz!
+            #ifdef DEBUG
+            Serial.print("Step length is less than the target step length, so buzzing!");
+            #endif
             buzzer->go();
+            float stepLen = -1;
+            if (stepLengthChar->notifyEnabled()) 
+            {
+                stepLengthChar->notify((uint8_t *)&stepLen, sizeof(float));
+            } 
        }
    }
 }
